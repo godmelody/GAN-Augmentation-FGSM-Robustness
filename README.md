@@ -16,10 +16,10 @@ The repository is organized as four incremental experiments, isolating the effec
 
 | # | File | GAN Augmentation | FGSM Attack | Purpose |
 |---|------|:-:|:-:|---------|
-| 01 | `01_baseline_mnist.ipynb` | No | No | Clean baseline accuracy |
-| 02 | `02_baseline_fgsm.ipynb` | No | Yes | Baseline robustness under FGSM |
-| 03 | `03_gan_augmentation.ipynb` | Yes | No | Effect of cGAN augmentation on clean accuracy |
-| 04 | `04_gan_augmentation_fgsm.ipynb` | Yes | Yes | Full study: augmentation vs. robustness trade-off |
+| 01 | `01_baseline_mnist.py` | No | No | Clean baseline accuracy |
+| 02 | `02_baseline_fgsm.py` | No | Yes | Baseline robustness under FGSM |
+| 03 | `03_gan_augmentation.py` | Yes | No | Effect of cGAN augmentation on clean accuracy |
+| 04 | `04_gan_augmentation_fgsm.py` | Yes | Yes | Full study: augmentation vs. robustness trade-off |
 
 ## Method
 
@@ -39,10 +39,10 @@ Install dependencies with pip: torch, torchvision, matplotlib, numpy.
 
 Each notebook runs independently:
 
-- `01_baseline_mnist.ipynb` — train ResNet-18 on clean MNIST, report clean accuracy
-- `02_baseline_fgsm.ipynb` — add FGSM attack, report adversarial accuracy and visualize examples
-- `03_gan_augmentation.ipynb` — train cGAN, augment MNIST, report accuracy with plots
-- `04_gan_augmentation_fgsm.ipynb` — full pipeline: cGAN augmentation + FGSM robustness evaluation
+- `01_baseline_mnist.py` — train ResNet-18 on clean MNIST, report clean accuracy
+- `02_baseline_fgsm.py` — add FGSM attack, report adversarial accuracy and visualize examples
+- `03_gan_augmentation.py` — train cGAN, augment MNIST, report accuracy with plots
+- `04_gan_augmentation_fgsm.py` — full pipeline: cGAN augmentation + FGSM robustness evaluation
 
 ## Key Findings
 
