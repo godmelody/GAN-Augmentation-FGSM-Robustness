@@ -1,0 +1,136 @@
+# ============================================================
+# 02. Baseline + FGSM: ResNet-18 on clean MNIST, attacked by FGSM
+# GAN augmentation: X | FGSM attack: O
+# ============================================================
+
+import torch
+import torch.nn as nn
+import torch.optim as optim
+from torch.utils.data import DataLoader
+from torchvision import datasets, transforms, models
+import matplotlib.pyplot as plt
+
+# -----------------------------
+# Hyperparameters
+# -----------------------------
+batch_size = 128
+lr = 0.001
+epochs = 5
+epsilon = 0.2   # FGSM attack strength
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+print("Device:", device)
+
+# -----------------------------
+# Dataset (MNIST)
+# -----------------------------
+transform = transforms.Compose([
+    transforms.Resize(32),
+    transforms.ToTensor(),
+    transforms.Normalize((0.5,), (0.5,))
+])
+train_dataset = datasets.MNIST(root='./data', train=True, download=True, transform=transform)
+test_dataset  = datasets.MNIST(root='./data', train=False, download=True, transform=transform)
+train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
+test_loader  = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
+
+# -----------------------------
+# Model (ResNet-18)
+# -----------------------------
+resnet = models.resnet18(weights=None)
+resnet.conv1 = nn.Conv2d(1, 64, kernel_size=7, stride=2, padding=3, bias=False)
+resnet.fc = nn.Linear(resnet.fc.in_features, 10)
+resnet = resnet.to(device)
+
+criterion = nn.CrossEntropyLoss()
+optimizer = optim.Adam(resnet.parameters(), lr=lr)
+
+# -----------------------------
+# Train
+# -----------------------------
+for epoch in range(epochs):
+    resnet.train()
+    running_loss = 0.0
+    for imgs, labels in train_loader:
+        imgs, labels = imgs.to(device), labels.to(device)
+        optimizer.zero_grad()
+        outputs = resnet(imgs)
+        loss = criterion(outputs, labels)
+        loss.backward()
+        optimizer.step()
+        running_loss += loss.item()
+    print(f"[Epoch {epoch+1}/{epochs}] Training Loss: {running_loss / len(train_loader):.4f}")
+
+# -----------------------------
+# Clean test accuracy
+# -----------------------------
+resnet.eval()
+correct = total = 0
+with torch.no_grad():
+    for imgs, labels in test_loader:
+        imgs, labels = imgs.to(device), labels.to(device)
+        preds = resnet(imgs).argmax(dim=1)
+        correct += (preds == labels).sum().item()
+        total += labels.size(0)
+print(f"\nTest Accuracy (clean): {100 * correct / total:.2f}%")
+
+# -----------------------------
+# FGSM attack
+# -----------------------------
+def fgsm_attack(image, epsilon, gradient):
+    perturbed = image + epsilon * gradient.sign()
+    return torch.clamp(perturbed, -1, 1)
+
+# -----------------------------
+# Adversarial test accuracy
+# -----------------------------
+correct = total = 0
+resnet.eval()
+for imgs, labels in test_loader:
+    imgs, labels = imgs.to(device), labels.to(device)
+    imgs.requires_grad = True
+    outputs = resnet(imgs)
+    loss = criterion(outputs, labels)
+    resnet.zero_grad()
+    loss.backward()
+    adv_imgs = fgsm_attack(imgs, epsilon, imgs.grad.data)
+    preds = resnet(adv_imgs).argmax(dim=1)
+    correct += (preds == labels).sum().item()
+    total += labels.size(0)
+print(f"Test Accuracy (FGSM, eps={epsilon}): {100 * correct / total:.2f}%")
+
+# -----------------------------
+# Visualize adversarial examples
+# -----------------------------
+def show_adversarial_examples(model, dataloader, epsilon, device, num_images=5):
+    model.eval()
+    shown = 0
+    for imgs, labels in dataloader:
+        imgs, labels = imgs.to(device), labels.to(device)
+        imgs.requires_grad = True
+        outputs = model(imgs)
+        loss = criterion(outputs, labels)
+        model.zero_grad()
+        loss.backward()
+        adv_imgs = fgsm_attack(imgs, epsilon, imgs.grad.data)
+        preds_adv = model(adv_imgs).argmax(dim=1)
+
+        imgs_v = imgs * 0.5 + 0.5
+        adv_v = adv_imgs * 0.5 + 0.5
+        for i in range(imgs.size(0)):
+            if shown >= num_images:
+                return
+            plt.figure(figsize=(6, 3))
+            plt.subplot(1, 2, 1)
+            plt.imshow(imgs_v[i].detach().squeeze().cpu().numpy(), cmap='gray')
+            plt.title(f"Original\nLabel: {labels[i].item()}")
+            plt.axis('off')
+            plt.subplot(1, 2, 2)
+            plt.imshow(adv_v[i].detach().squeeze().cpu().numpy(), cmap='gray')
+            color = 'green' if preds_adv[i] == labels[i] else 'red'
+            plt.title(f"Adversarial\nPred: {preds_adv[i].item()}", color=color)
+            plt.axis('off')
+            plt.tight_layout()
+            plt.show()
+            shown += 1
+
+show_adversarial_examples(resnet, test_loader, epsilon, device, num_images=5)
